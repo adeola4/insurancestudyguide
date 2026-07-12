@@ -245,9 +245,9 @@ function Dashboard({ state, license, onBack }: { state: string; license: string;
   const [mode, setMode] = useState<'flashcards' | 'quiz' | 'mock' | 'plan' | 'profile' | 'admin' | null>(null)
   const questions: Question[] = useMemo(() => SEED_QUESTIONS.filter((q) => q.state === state && q.license_type === license), [state, license])
 
-  if (mode === 'flashcards') return <View title="Flashcards" desc="Review questions from your selected state and license." back={onBack} ><FlashcardView questions={questions}  onDone={onBack} /></View>
-  if (mode === 'quiz') return <View title="Quizzes" desc="10-question practice quiz from your selection." back={onBack} ><QuizView questions={questions}  onDone={onBack} /></View>
-  if (mode === 'mock') return <View title="Mock Exam" desc="Full timed mock exam for your exam profile." back={onBack} ><MockView questions={questions}  /></View>
+  if (mode === 'flashcards') return <View title="Flashcards" desc="Review questions from your selected state and license." back={onBack} ><FlashcardView questions={questions} onBack={onBack} onDone={onBack} /></View>
+  if (mode === 'quiz') return <View title="Quizzes" desc="10-question practice quiz from your selection." back={onBack} ><QuizView questions={questions} onBack={onBack} onDone={onBack} /></View>
+  if (mode === 'mock') return <View title="Mock Exam" desc="Full timed mock exam for your exam profile." back={onBack} ><MockView questions={questions} onBack={onBack} /></View>
   if (mode === 'plan') return <View title="Study Plan" desc="Planned topics and weak-area focus." back={onBack} ><StudyPlanView questions={questions} state={state} license={license} /></View>
   if (mode === 'profile') return <View title="Profile" desc="Saved progress and mastery summary." back={onBack} ><ProfileView questions={questions} state={state} license={license} /></View>
   if (mode === 'admin') return <View title="Content" desc="Question bank management." back={onBack} ><AdminView questions={questions} /></View>
