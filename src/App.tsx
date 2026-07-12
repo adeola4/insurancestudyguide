@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react'
 import { motion } from 'framer-motion'
 import { BookOpen, ClipboardList, Gauge, ArrowRight } from 'lucide-react'
-import { STATES, LICENSE_TYPES, SEED_QUESTIONS } from './db/questions'
+import { STATES, LICENSE_TYPES, NATIONAL, SEED_QUESTIONS } from './db/questions'
 import type { Question } from './types'
 
 function shuffle<T>(arr: T[]): T[] {
@@ -241,9 +241,16 @@ function MockView({ questions, onBack }: { questions: Question[]; onBack: () => 
   )
 }
 
+function selectQuestions(state: string, license: string): Question[] {
+  if (!state || !license) return []
+  const stateQs = SEED_QUESTIONS.filter((q) => q.state === state && q.license_type === license)
+  const natlQs = SEED_QUESTIONS.filter((q) => q.state === NATIONAL && q.license_type === license)
+  return [...stateQs, ...natlQs]
+}
+
 function Dashboard({ state, license, onBack }: { state: string; license: string; onBack: () => void }) {
   const [mode, setMode] = useState<'flashcards' | 'quiz' | 'mock' | 'plan' | 'profile' | 'admin' | null>(null)
-  const questions: Question[] = useMemo(() => SEED_QUESTIONS.filter((q) => q.state === state && q.license_type === license), [state, license])
+  const questions: Question[] = useMemo(() => selectQuestions(state, license), [state, license])
 
   if (mode === 'flashcards') return <View title="Flashcards" desc="Review questions from your selected state and license." back={onBack} ><FlashcardView questions={questions} onBack={onBack} onDone={onBack} /></View>
   if (mode === 'quiz') return <View title="Quizzes" desc="10-question practice quiz from your selection." back={onBack} ><QuizView questions={questions} onBack={onBack} onDone={onBack} /></View>
@@ -353,10 +360,7 @@ export default function App() {
   const [license, setLicense] = useState('')
   const [mode, setMode] = useState<'landing' | 'study' | 'dashboard'>('landing')
 
-  const questions: Question[] = useMemo(() => {
-    if (!state || !license) return []
-    return SEED_QUESTIONS.filter((q) => q.state === state && q.license_type === license)
-  }, [state, license])
+  const questions: Question[] = useMemo(() => selectQuestions(state, license), [state, license])
 
   return (
     <div className="relative min-h-screen bg-dark-950 text-gray-200 bg-grid overflow-hidden">
