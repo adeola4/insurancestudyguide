@@ -3,6 +3,7 @@ import { motion } from 'framer-motion'
 import { BookOpen, ClipboardList, Gauge, ArrowRight } from 'lucide-react'
 import { STATES, LICENSE_TYPES, NATIONAL, SEED_QUESTIONS } from './db/questions'
 import type { Question } from './types'
+import { useProgress } from './lib/progress'
 
 function shuffle<T>(arr: T[]): T[] {
   const a = [...arr]
@@ -94,12 +95,13 @@ function FlashcardView({ questions, onBack, onDone }: { questions: Question[]; o
   )
 }
 
-function QuizView({ questions, onBack, onDone }: { questions: Question[]; onBack: () => void; onDone: () => void }) {
+function QuizView({ questions, state, license, onBack, onDone, onFinish }: { questions: Question[]; state: string; license: string; onBack: () => void; onDone: () => void; onFinish: (correct: number, total: number, results: { topic: string; correct: boolean }[]) => void }) {
   const [queue] = useState<Question[]>(() => shuffle(questions).slice(0, Math.min(10, questions.length)))
   const [index, setIndex] = useState(0)
   const [selected, setSelected] = useState<number | null>(null)
   const [score, setScore] = useState(0)
   const [finished, setFinished] = useState(false)
+  const [results, setResults] = useState<{ topic: string; correct: boolean }[]>([])
 
   const current = queue[index]
   const total = queue.length
@@ -131,7 +133,7 @@ function QuizView({ questions, onBack, onDone }: { questions: Question[]; onBack
       <div className="mt-8 rounded-2xl border border-white/[0.06] bg-dark-800/60 p-6">
         <div className="text-white text-xl font-semibold">Quiz Complete</div>
         <div className="mt-2 text-gray-400">Score: {score} / {total}</div>
-        <div className="mt-2 text-gray-400 text-sm">Results are saved in later phases.</div>
+        <div className="mt-2 text-gray-400 text-sm">Saved to this device.</div>
         <div className="mt-4 flex gap-3">
           <Button onClick={restart} className="bg-white text-dark-950 hover:bg-gray-200">Retake Quiz</Button>
           <Button onClick={onDone} className="border-white/10 bg-white/5">Dashboard</Button>
@@ -166,7 +168,7 @@ function QuizView({ questions, onBack, onDone }: { questions: Question[]; onBack
   )
 }
 
-function MockView({ questions, onBack }: { questions: Question[]; onBack: () => void }) {
+function MockView({ questions, state, license, onBack, onFinish }: { questions: Question[]; state: string; license: string; onBack: () => void; onFinish: (correct: number, total: number, results: { topic: string; correct: boolean }[]) => void }) {
   const pool = useMemo(() => {
     const deduped = Array.from(new Map(questions.map((q) => [q.id, q])).values())
     return shuffle(deduped)
@@ -175,6 +177,7 @@ function MockView({ questions, onBack }: { questions: Question[]; onBack: () => 
   const [selected, setSelected] = useState<number | null>(null)
   const [score, setScore] = useState(0)
   const [finished, setFinished] = useState(false)
+  const [results, setResults] = useState<{ topic: string; correct: boolean }[]>([])
 
   const current = pool[index]
   const total = Math.min(pool.length, 50)
@@ -183,9 +186,11 @@ function MockView({ questions, onBack }: { questions: Question[]; onBack: () => 
   const submit = (idx: number) => {
     if (selected !== null || !current) return
     setSelected(idx)
-    if (idx === current.correct_index) setScore((s) => s + 1)
+    const correct = idx === current.correct_index
+    if (correct) setScore((s) => s + 1)
+    setResults((prev) => [...prev, { topic: current.topic, correct }])
     setTimeout(() => {
-      if (index + 1 >= total) setFinished(true)
+      if (index + 1 >= total) { setFinished(true); onFinish(score + (correct ? 1 : 0), total, [...results, { topic: current.topic, correct }]) }
       else {
         setIndex((i) => i + 1)
         setSelected(null)
@@ -196,6 +201,7 @@ function MockView({ questions, onBack }: { questions: Question[]; onBack: () => 
     setIndex(0)
     setSelected(null)
     setScore(0)
+    setResults([])
     setFinished(false)
   }
 
@@ -206,7 +212,7 @@ function MockView({ questions, onBack }: { questions: Question[]; onBack: () => 
       <div className="mt-8 rounded-2xl border border-white/[0.06] bg-dark-800/60 p-6">
         <div className="text-white text-xl font-semibold">Mock Complete</div>
         <div className="mt-2 text-gray-400">Score: {score} / {total}</div>
-        <div className="mt-2 text-gray-400 text-sm">History stays local in this build.</div>
+        <div className="mt-2 text-gray-400 text-sm">Saved to this device.</div>
         <div className="mt-4 flex gap-3">
           <Button onClick={restart} className="bg-white text-dark-950 hover:bg-gray-200">Retake Mock</Button>
           <Button onClick={onBack} className="border-white/10 bg-white/5">Back</Button>
@@ -248,15 +254,15 @@ function selectQuestions(state: string, license: string): Question[] {
   return [...stateQs, ...natlQs]
 }
 
-function Dashboard({ state, license, onBack }: { state: string; license: string; onBack: () => void }) {
+function Dashboard({ state, license, onBack, onResult, onSession, progress, sessions }: { state: string; license: string; onBack: () => void; onResult: (results: { topic: string; correct: boolean }[], correct: number, total: number) => void; onSession: (mode: 'flashcards' | 'quiz' | 'mock') => void; progress: { state: string; license_type: string; topic: string; total_questions: number; correct_answers: number; last_practiced: number }[]; sessions: { state: string; license_type: string; mode: string; finished_at: number; score?: { correct: number; total: number } }[] }) {
   const [mode, setMode] = useState<'flashcards' | 'quiz' | 'mock' | 'plan' | 'profile' | 'admin' | null>(null)
   const questions: Question[] = useMemo(() => selectQuestions(state, license), [state, license])
 
-  if (mode === 'flashcards') return <View title="Flashcards" desc="Review questions from your selected state and license." back={onBack} ><FlashcardView questions={questions} onBack={onBack} onDone={onBack} /></View>
-  if (mode === 'quiz') return <View title="Quizzes" desc="10-question practice quiz from your selection." back={onBack} ><QuizView questions={questions} onBack={onBack} onDone={onBack} /></View>
-  if (mode === 'mock') return <View title="Mock Exam" desc="Full timed mock exam for your exam profile." back={onBack} ><MockView questions={questions} onBack={onBack} /></View>
+  if (mode === 'flashcards') return <View title="Flashcards" desc="Review questions from your selected state and license." back={onBack} ><FlashcardView questions={questions} onBack={onBack} onDone={() => { onSession('flashcards'); onBack() }} /></View>
+  if (mode === 'quiz') return <View title="Quizzes" desc="10-question practice quiz from your selection." back={onBack} ><QuizView questions={questions} state={state} license={license} onBack={onBack} onDone={onBack} onFinish={(correct, total, results) => { onResult(results, correct, total); onSession('quiz') }} /></View>
+  if (mode === 'mock') return <View title="Mock Exam" desc="Full timed mock exam for your exam profile." back={onBack} ><MockView questions={questions} state={state} license={license} onBack={onBack} onFinish={(correct, total, results) => { onResult(results, correct, total); onSession('mock') }} /></View>
   if (mode === 'plan') return <View title="Study Plan" desc="Planned topics and weak-area focus." back={onBack} ><StudyPlanView questions={questions} state={state} license={license} /></View>
-  if (mode === 'profile') return <View title="Profile" desc="Saved progress and mastery summary." back={onBack} ><ProfileView questions={questions} state={state} license={license} /></View>
+  if (mode === 'profile') return <View title="Profile" desc="Saved progress and mastery summary." back={onBack} ><ProfileView state={state} license={license} progress={progress} sessions={sessions} /></View>
   if (mode === 'admin') return <View title="Content" desc="Question bank management." back={onBack} ><AdminView questions={questions} /></View>
 
   return (
@@ -325,21 +331,44 @@ function StudyPlanView({ questions, state, license }: { questions: Question[]; s
   )
 }
 
-function ProfileView({ questions, state, license }: { questions: Question[]; state: string; license: string }) {
-  const percent = questions.length === 0 ? 0 : 100
+function ProfileView({ state, license, progress, sessions }: { state: string; license: string; progress: { state: string; license_type: string; topic: string; total_questions: number; correct_answers: number; last_practiced: number }[]; sessions: { state: string; license_type: string; mode: string; finished_at: number; score?: { correct: number; total: number } }[] }) {
+  const scoped = progress.filter((p) => p.state === state && p.license_type === license)
+  const totalQ = scoped.reduce((a, p) => a + p.total_questions, 0)
+  const correctQ = scoped.reduce((a, p) => a + p.correct_answers, 0)
+  const percent = totalQ === 0 ? 0 : Math.round((correctQ / totalQ) * 100)
+  const weak = [...scoped].sort((a, b) => (a.correct_answers / a.total_questions) - (b.correct_answers / b.total_questions)).slice(0, 3)
   return (
     <div className="grid gap-4 md:grid-cols-2">
       <div className="rounded-2xl border border-white/[0.06] bg-dark-800/60 p-6">
         <div className="text-white text-xl font-semibold">Progress</div>
         <div className="mt-2 text-gray-400">{state} • {license}</div>
-        <div className="mt-4 text-sm text-gray-300">Mastery estimate: {Math.round(percent)}%</div>
+        <div className="mt-4 text-sm text-gray-300">Mastery estimate: {percent}% ({correctQ}/{totalQ} answered correctly)</div>
         <div className="mt-2 h-2 w-full rounded bg-dark-700">
           <div className="h-2 rounded bg-neon-cyan transition-all" style={{ width: `${percent}%` }} />
         </div>
+        {weak.length > 0 && (
+          <div className="mt-4">
+            <div className="text-xs text-muted mb-2">Focus areas</div>
+            <div className="flex flex-wrap gap-2">
+              {weak.map((w) => <span key={w.topic} className="rounded-lg border border-red-500/20 bg-red-500/5 px-3 py-1 text-xs text-gray-300">{w.topic} ({Math.round((w.correct_answers / w.total_questions) * 100)}%)</span>)}
+            </div>
+          </div>
+        )}
       </div>
       <div className="rounded-2xl border border-white/[0.06] bg-dark-800/60 p-6">
         <div className="text-white text-xl font-semibold">History</div>
-        <div className="mt-2 text-gray-400 text-sm">No saved sessions yet.</div>
+        {sessions.length === 0 ? (
+          <div className="mt-2 text-gray-400 text-sm">No saved sessions yet. Complete a quiz or mock to start tracking.</div>
+        ) : (
+          <div className="mt-2 space-y-2 text-sm text-gray-300">
+            {sessions.slice(0, 8).map((s, i) => (
+              <div key={i} className="flex justify-between border-b border-white/5 pb-1">
+                <span>{s.mode} • {s.state}</span>
+                <span className="text-gray-400">{s.score ? `${s.score.correct}/${s.score.total}` : '—'} · {new Date(s.finished_at).toLocaleDateString()}</span>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   )
@@ -359,8 +388,17 @@ export default function App() {
   const [state, setState] = useState('')
   const [license, setLicense] = useState('')
   const [mode, setMode] = useState<'landing' | 'study' | 'dashboard'>('landing')
+  const { progress, sessions, recordSession, recordResult } = useProgress()
 
   const questions: Question[] = useMemo(() => selectQuestions(state, license), [state, license])
+
+  const handleResult = (results: { topic: string; correct: boolean }[], correct: number, total: number) => {
+    recordResult(state, license, results)
+    recordSession({ state, license_type: license, mode: total > 10 ? 'mock' : 'quiz', finished_at: Date.now(), score: { correct, total } })
+  }
+  const handleSession = (m: 'flashcards' | 'quiz' | 'mock') => {
+    if (m === 'flashcards') recordSession({ state, license_type: license, mode: m, finished_at: Date.now() })
+  }
 
   return (
     <div className="relative min-h-screen bg-dark-950 text-gray-200 bg-grid overflow-hidden">
@@ -403,7 +441,7 @@ export default function App() {
       )}
 
       {mode === 'study' && <FlashcardView questions={questions} onBack={() => setMode('dashboard')} onDone={() => setMode('dashboard')} />}
-      {mode === 'dashboard' && <Dashboard state={state} license={license} onBack={() => setMode('landing')} />}
+      {mode === 'dashboard' && <Dashboard state={state} license={license} onBack={() => setMode('landing')} onResult={handleResult} onSession={handleSession} progress={progress} sessions={sessions} />}
 
       <footer className="relative z-10 max-w-7xl mx-auto px-6 py-10 text-xs text-muted">InsuranceStudyGuide — approved scope only.</footer>
     </div>
