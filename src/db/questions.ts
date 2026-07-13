@@ -1,4 +1,5 @@
 import type { Question } from '../types'
+import sourcedBank from './sourced/bank.json'
 
 export const STATES = [
   'Alabama','Alaska','Arizona','Arkansas','California','Colorado','Connecticut','Delaware',
@@ -362,3 +363,8 @@ export const SEED_QUESTIONS: Question[] = [
     explanation: 'Transacting insurance without a license in Florida is unlawful and can carry criminal penalties.'
   }
 ]
+
+// Real questions extracted verbatim from public practice-exam sources.
+// Source-tagged. Items with correct_index < 0 are pending an answer key
+// (the source page did not expose the correct choice in static HTML).
+export const SOURCED_QUESTIONS = sourcedBank as Question[]

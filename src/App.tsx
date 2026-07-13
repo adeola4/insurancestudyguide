@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react'
 import { motion } from 'framer-motion'
 import { BookOpen, ClipboardList, Gauge, ArrowRight } from 'lucide-react'
-import { STATES, LICENSE_TYPES, NATIONAL, SEED_QUESTIONS } from './db/questions'
+import { STATES, LICENSE_TYPES, NATIONAL, SEED_QUESTIONS, SOURCED_QUESTIONS } from './db/questions'
 import type { Question } from './types'
 import { useProgress } from './lib/progress'
 
@@ -251,7 +251,11 @@ function selectQuestions(state: string, license: string): Question[] {
   if (!state || !license) return []
   const stateQs = SEED_QUESTIONS.filter((q) => q.state === state && q.license_type === license)
   const natlQs = SEED_QUESTIONS.filter((q) => q.state === NATIONAL && q.license_type === license)
-  return [...stateQs, ...natlQs]
+  // Sourced questions that have a verified answer key (correct_index >= 0)
+  const sourced = SOURCED_QUESTIONS.filter(
+    (q) => q.correct_index >= 0 && (q.state === state || q.state === NATIONAL) && q.license_type === license
+  )
+  return [...stateQs, ...natlQs, ...sourced]
 }
 
 function Dashboard({ state, license, onBack, onResult, onSession, progress, sessions }: { state: string; license: string; onBack: () => void; onResult: (results: { topic: string; correct: boolean }[], correct: number, total: number) => void; onSession: (mode: 'flashcards' | 'quiz' | 'mock') => void; progress: { state: string; license_type: string; topic: string; total_questions: number; correct_answers: number; last_practiced: number }[]; sessions: { state: string; license_type: string; mode: string; finished_at: number; score?: { correct: number; total: number } }[] }) {
